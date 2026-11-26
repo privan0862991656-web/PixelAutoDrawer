@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_gradient"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="8dp"
+            android:text="✦ PIXEL AUTO DRAWER ✦"
+            android:textColor="@color/gold"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/tvAccessStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/light"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/btnAccess"
+                style="@style/GoldButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="♿ ไปตั้งค่า Accessibility" />
+
+            <TextView
+                android:id="@+id/tvOverlayStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:textColor="@color/light"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/btnOverlay"
+                style="@style/GoldButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="🪟 ไปอนุญาตแสดงทับแอป" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <Button
+                android:id="@+id/btnPick"
+                style="@style/GoldButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🖼 เลือกรูปต้นแบบจากแกลเลอรี" />
+
+            <ImageView
+                android:id="@+id/imgPreview"
+                android:layout_width="match_parent"
+                android:layout_height="240dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_hint"
+                android:padding="8dp"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/tvPlanInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:text="ยังไม่ได้เลือกภาพ"
+                android:textColor="@color/light" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="ขนาดตารางพิกเซลเป้าหมาย"
+                android:textColor="@color/gold"
+                android:textStyle="bold" />
+
+            <RadioGroup
+                android:id="@+id/rgSize"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/rb32"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:buttonTint="@color/gold"
+                    android:checked="true"
+                    android:text="32×32"
+                    android:textColor="@color/light" />
+
+                <RadioButton
+                    android:id="@+id/rb64"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:buttonTint="@color/gold"
+                    android:text="64×64"
+                    android:textColor="@color/light" />
+
+                <RadioButton
+                    android:id="@+id/rb128"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:buttonTint="@color/gold"
+                    android:text="128×128"
+                    android:textColor="@color/light" />
+            </RadioGroup>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <Button
+                android:id="@+id/btnOpenPanel"
+                style="@style/GoldButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="✨ เปิดแผงควบคุมลอย" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>
