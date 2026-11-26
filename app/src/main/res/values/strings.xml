@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Pixel Auto Drawer</string>
+    <string name="a11y_desc">ช่วยแตะหน้าจอตามพิกัดที่กำหนดเพื่อวาดภาพพิกเซลอัตโนมัติ</string>
+</resources>
