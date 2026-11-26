@@ -58,6 +58,9 @@ class FloatingService : Service() {
     private lateinit var btnGhost: Button
     private lateinit var btnSpeed: Button
     private lateinit var btnMult: Button
+    private lateinit var btnColors: Button
+    private lateinit var btnPalArea: Button
+    private lateinit var btnPalAuto: Button
     private lateinit var btnStart: Button
     private lateinit var btnStop: Button
 
@@ -184,6 +187,9 @@ class FloatingService : Service() {
         btnGhost = v.findViewById(R.id.btnGhost)
         btnSpeed = v.findViewById(R.id.btnSpeed)
         btnMult = v.findViewById(R.id.btnMult)
+        btnColors = v.findViewById(R.id.btnColors)
+        btnPalArea = v.findViewById(R.id.btnPalArea)
+        btnPalAuto = v.findViewById(R.id.btnPalAuto)
         btnStart = v.findViewById(R.id.btnStart)
         btnStop = v.findViewById(R.id.btnStop)
         val btnSkip: Button = v.findViewById(R.id.btnSkip)
@@ -223,7 +229,17 @@ class FloatingService : Service() {
             startPaletteCalibration()
         }
 
-        btnReselect.setOnClickListener {
+        btnPalArea.setOnClickListener {
+            it.pulse()
+            calibratePaletteArea()
+        }
+
+        btnPalAuto.setOnClickListener {
+            it.pulse()
+            autoMatchPalette()
+        }
+
+        v.findViewById<Button>(R.id.btnReselect).setOnClickListener {
             it.pulse()
             reselectCurrent()
         }
@@ -246,16 +262,28 @@ class FloatingService : Service() {
             refreshStatus()
         }
 
+        btnColors.setOnClickListener {
+            it.pulse()
+            if (AppState.running.value) {
+                toast("หยุดการวาดก่อนเปลี่ยนจำนวนสี")
+                return@setOnClickListener
+            }
+            AppState.cycleColorLimit()
+            AppState.rebuild()
+            removeGhost()
+            refreshStatus()
+            toast("ปรับเป็น ${AppState.colorLimit} สี ต้องตั้งถาดสีใหม่")
+        }
+
         btnStart.setOnClickListener {
             it.pulse()
             val svc = PixelAccessibilityService.instance
-            val missing = AppState.missingSwatches()
             when {
                 svc == null -> toast("เปิดสิทธิ์ Accessibility ของแอปนี้ก่อน")
                 AppState.plan == null -> toast("เลือกภาพต้นแบบในหน้าหลักก่อน")
                 AppState.topLeft == null || AppState.bottomRight == null ->
                     toast("ตั้งมุมผืนผ้าใบให้ครบก่อน")
-                missing > 0 -> toast("ยังไม่ได้ตั้งถาดสี $missing สี (ตั้งสี หรือกดข้ามสี)")
+                AppState.swatchCount() == 0 -> toast("ตั้งถาดสีอย่างน้อย 1 สีก่อน")
                 svc.startDrawing() -> minimizeToBubble()
                 else -> toast("เริ่มวาดไม่ได้")
             }
@@ -325,6 +353,7 @@ class FloatingService : Service() {
                 "ขนาด ${AppState.gridSize}×${AppState.gridSize} · ข้าม ${AppState.skipped.size} สี"
         btnSpeed.text = "⚡ ${AppState.speed.label}"
         btnMult.text = "⏩ ×${AppState.multiplier}"
+        btnColors.text = "🎚 จำนวนสี: ${AppState.colorLimit}"
         btnGhost.text = if (ghost != null) "🙈 ซ่อนภาพ" else "👻 ภาพซ้อน"
     }
 
@@ -393,7 +422,6 @@ class FloatingService : Service() {
             return
         }
         PixelAccessibilityService.instance?.pauseDrawing()
-        // ถ้าเคยวาดกลุ่มนี้ไปบางส่วน ย้อนกลับไปเริ่มกลุ่มนี้ใหม่ด้วยสีใหม่
         val segs = buildSegments(plan.groups[gi].cells)
         AppState.doneCells -= segs.take(AppState.resumeSegment).sumOf { it.count }
         AppState.resumeSegment = 0
@@ -456,7 +484,62 @@ class FloatingService : Service() {
         confirm = null
     }
 
-    // ---------- การแตะตำแหน่ง (overlay เต็มจอชั่วคราว) ----------
+    // ---------- ขอบถาดสีและจับสีอัตโนมัติ ----------
+
+    private fun calibratePaletteArea() {
+        PixelAccessibilityService.instance?.pauseDrawing()
+        beginCapture("แตะ 'มุมซ้ายบน' ของแถบสีในแอปวาดรูป") { x, y ->
+            AppState.paletteTL = PointF(x, y)
+            beginCapture("แตะ 'มุมขวาล่าง' ของแถบสีในแอปวาดรูป") { x2, y2 ->
+                AppState.paletteBR = PointF(x2, y2)
+                refreshStatus()
+                toast("บันทึกขอบถาดสีแล้ว")
+            }
+        }
+    }
+
+    private fun autoMatchPalette() {
+        val svc = PixelAccessibilityService.instance
+        if (svc == null) {
+            toast("เปิดสิทธิ์ Accessibility ของแอปนี้ก่อน")
+            return
+        }
+        val plan = AppState.plan
+        if (plan == null) {
+            toast("เลือกภาพต้นแบบก่อน")
+            return
+        }
+        val tl = AppState.paletteTL
+        val br = AppState.paletteBR
+        if (tl == null || br == null) {
+            toast("กด 'ขอบถาดสี' แล้วแตะมุมถาดก่อน")
+            return
+        }
+
+        hideUi()
+        handler.postDelayed({
+            svc.captureScreen { bmp ->
+                restoreUi()
+                if (bmp == null) {
+                    toast("อ่านหน้าจอไม่ได้ (ต้อง Android 11 ขึ้นไป และเปิดสิทธิ์ Accessibility ใหม่)")
+                    return@captureScreen
+                }
+                val found = PaletteDetector.detect(
+                    bmp, tl.x.toInt(), tl.y.toInt(), br.x.toInt(), br.y.toInt()
+                )
+                if (found.isEmpty()) {
+                    toast("หาสีในถาดไม่เจอ ลองตั้งขอบถาดใหม่ให้ครอบเฉพาะช่องสี")
+                    return@captureScreen
+                }
+                val matched = PaletteDetector.match(plan.groups.map { it.rgb }, found)
+                matched.forEachIndexed { i, s -> AppState.setSwatch(i, PointF(s.x, s.y)) }
+                refreshStatus()
+                toast("จับคู่ ${matched.size} สีจากถาด ${found.size} ช่อง")
+            }
+        }, 400L)
+    }
+
+    // ---------- จับจุดแตะ (ซ่อนแผงชั่วคราว) ----------
 
     /**
      * ซ่อนแผงชั่วคราว รอรับการแตะ 1 ครั้ง แล้วเรียก onTap
@@ -516,127 +599,4 @@ class FloatingService : Service() {
     private fun attachDrag(
         handle: View,
         root: View,
-        lp: WindowManager.LayoutParams,
-        onClick: (() -> Unit)?
-    ) {
-        val slop = ViewConfiguration.get(this).scaledTouchSlop
-        var startX = 0
-        var startY = 0
-        var touchX = 0f
-        var touchY = 0f
-        var moved = false
-
-        handle.setOnTouchListener { _, e ->
-            when (e.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    startX = lp.x
-                    startY = lp.y
-                    touchX = e.rawX
-                    touchY = e.rawY
-                    moved = false
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    val dx = e.rawX - touchX
-                    val dy = e.rawY - touchY
-                    if (abs(dx) > slop || abs(dy) > slop) moved = true
-                    if (moved) {
-                        lp.x = startX + dx.toInt()
-                        lp.y = startY + dy.toInt()
-                        runCatching { wm.updateViewLayout(root, lp) }
-                    }
-                }
-                MotionEvent.ACTION_UP -> {
-                    if (moved) {
-                        snapToEdge(root, lp)
-                        runCatching { wm.updateViewLayout(root, lp) }
-                    } else {
-                        onClick?.invoke()
-                    }
-                }
-            }
-            true
-        }
-    }
-
-    /** ดีดให้ชิดขอบซ้ายหรือขวาที่ใกล้ที่สุด และไม่ให้หลุดจอ */
-    private fun snapToEdge(view: View, lp: WindowManager.LayoutParams) {
-        val dm = resources.displayMetrics
-        val w = if (view.width > 0) view.width else dp(220)
-        val h = if (view.height > 0) view.height else dp(52)
-        val margin = dp(4)
-        lp.x = if (lp.x + w / 2 < dm.widthPixels / 2) margin else dm.widthPixels - w - margin
-        val maxY = maxOf(dp(24), dm.heightPixels - h - dp(24))
-        lp.y = lp.y.coerceIn(dp(24), maxY)
-    }
-
-    // ---------- ภาพซ้อนทับ (ghost) ----------
-
-    private fun toggleGhost() {
-        if (ghost != null) {
-            removeGhost()
-            refreshStatus()
-            return
-        }
-        val tl = AppState.topLeft
-        val br = AppState.bottomRight
-        val bmp = AppState.scaledBitmap
-        if (tl == null || br == null || bmp == null) {
-            toast("ตั้งมุมและเลือกภาพก่อน")
-            return
-        }
-
-        val iv = ImageView(this).apply {
-            setImageBitmap(bmp)
-            scaleType = ImageView.ScaleType.FIT_XY
-            alpha = 0.45f
-        }
-        val lp = WindowManager.LayoutParams(
-            (br.x - tl.x).toInt(),
-            (br.y - tl.y).toInt(),
-            overlayType(),
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = tl.x.toInt()
-            y = tl.y.toInt()
-        }
-        wm.addView(iv, lp)
-        ghost = iv
-        refreshStatus()
-    }
-
-    // ---------- ตัวช่วยลบ view ----------
-
-    private fun removeView(v: View?) {
-        if (v != null) runCatching { wm.removeView(v) }
-    }
-
-    private fun removePanel() {
-        stopObserving()
-        removeView(panel)
-        panel = null
-    }
-
-    private fun removeBubble() {
-        removeView(bubble)
-        bubble = null
-    }
-
-    private fun removeCapture() {
-        removeView(capture)
-        capture = null
-    }
-
-    private fun removeGhost() {
-        removeView(ghost)
-        ghost = null
-    }
-
-    private fun toast(msg: String) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-    }
-}
+        lp: WindowManager.LayoutParams
