@@ -6,8 +6,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
 import android.graphics.Path
 import android.graphics.PointF
+import android.os.Build
+import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
@@ -61,6 +64,31 @@ class PixelAccessibilityService : AccessibilityService() {
         scope.cancel()
         instance = null
         super.onDestroy()
+    }
+
+    /** ถ่ายภาพหน้าจอที่ซ่อน (ต้อง Android 11 ขึ้นไป) คืน null ถ้าถ่ายไม่ได้ */
+    fun captureScreen(onResult: (Bitmap?) -> Unit) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            onResult(null)
+            return
+        }
+        takeScreenshot(
+            Display.DEFAULT_DISPLAY,
+            mainExecutor,
+            object : TakeScreenshotCallback {
+                override fun onSuccess(screenshot: ScreenshotResult) {
+                    val hb = screenshot.hardwareBuffer
+                    val bmp = Bitmap.wrapHardwareBuffer(hb, screenshot.colorSpace)
+                        ?.copy(Bitmap.Config.ARGB_8888, false)
+                    hb.close()
+                    onResult(bmp)
+                }
+
+                override fun onFailure(errorCode: Int) {
+                    onResult(null)
+                }
+            }
+        )
     }
 
     /** เริ่มหรือทำต่อจากตำแหน่งที่ค้างไว้ คืน false ถ้าข้อมูลไม่พร้อม */
