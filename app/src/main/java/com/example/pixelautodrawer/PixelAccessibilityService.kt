@@ -66,29 +66,25 @@ class PixelAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
-    /** ถ่ายภาพหน้าจอที่ซ่อน (ต้อง Android 11 ขึ้นไป) คืน null ถ้าถ่ายไม่ได้ */
+    /** อ่านภาพหน้าจอทั้งจอ (ต้อง Android 11 ขึ้นไป) คืน null ถ้าอ่านไม่ได้ */
     fun captureScreen(onResult: (Bitmap?) -> Unit) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             onResult(null)
             return
         }
-        takeScreenshot(
-            Display.DEFAULT_DISPLAY,
-            mainExecutor,
-            object : TakeScreenshotCallback {
-                override fun onSuccess(screenshot: ScreenshotResult) {
-                    val hb = screenshot.hardwareBuffer
-                    val bmp = Bitmap.wrapHardwareBuffer(hb, screenshot.colorSpace)
-                        ?.copy(Bitmap.Config.ARGB_8888, false)
-                    hb.close()
-                    onResult(bmp)
-                }
-
-                override fun onFailure(errorCode: Int) {
-                    onResult(null)
-                }
+        takeScreenshot(Display.DEFAULT_DISPLAY, mainExecutor, object : TakeScreenshotCallback {
+            override fun onSuccess(screenshot: ScreenshotResult) {
+                val hb = screenshot.hardwareBuffer
+                val bmp = Bitmap.wrapHardwareBuffer(hb, screenshot.colorSpace)
+                    ?.copy(Bitmap.Config.ARGB_8888, false)
+                hb.close()
+                onResult(bmp)
             }
-        )
+
+            override fun onFailure(errorCode: Int) {
+                onResult(null)
+            }
+        })
     }
 
     /** เริ่มหรือทำต่อจากตำแหน่งที่ค้างไว้ คืน false ถ้าข้อมูลไม่พร้อม */
@@ -97,7 +93,6 @@ class PixelAccessibilityService : AccessibilityService() {
         val tl = AppState.topLeft ?: return false
         val br = AppState.bottomRight ?: return false
         if (job?.isActive == true) return false
-        if (AppState.missingSwatches() > 0) return false
         if (AppState.isFinished()) AppState.resetProgress()
 
         val cw = (br.x - tl.x) / plan.size
@@ -110,7 +105,6 @@ class PixelAccessibilityService : AccessibilityService() {
                 drawAll(plan, tl, cw, ch)
             } finally {
                 AppState.running.value = false
-                // พักอยู่ = มีความคืบหน้าแต่ยังวาดไม่ครบ
                 AppState.paused.value = AppState.hasProgress() && !AppState.isFinished()
             }
         }
@@ -123,7 +117,7 @@ class PixelAccessibilityService : AccessibilityService() {
         job = null
     }
 
-    private suspend fun drawAll(plan: DrawPlan, tl: PointF, cw: Float, ch: Float): Boolean {
+    private suspend fun drawAll(plan: DrawPlan, tl: PointF, cw: Float, ch: Float) {
         while (AppState.resumeGroup < plan.groups.size) {
             val gi = AppState.resumeGroup
             val segs = buildSegments(plan.groups[gi].cells)
@@ -139,7 +133,7 @@ class PixelAccessibilityService : AccessibilityService() {
 
             // เปลี่ยนสีเฉพาะตอนเริ่มกลุ่ม ตอนทำต่อกลางกลุ่มสีเดิมยังถูกเลือกอยู่
             if (AppState.resumeSegment == 0) {
-                if (!gesture(tapPath(sw.x, sw.y), tapDuration())) return false
+                if (!gesture(tapPath(sw.x, sw.y), tapDuration())) return
                 delay(AppState.colorDelayMs())
             }
 
@@ -149,7 +143,7 @@ class PixelAccessibilityService : AccessibilityService() {
                 val x0 = tl.x + (seg.x0 + 0.5f) * cw
                 val x1 = tl.x + (seg.x1 + 0.5f) * cw
                 val y = tl.y + (seg.y + 0.5f) * ch
-                if (!gesture(linePath(x0, x1, y), dragDuration(seg.count))) return false
+                if (!gesture(linePath(x0, x1, y), dragDuration(seg.count))) return
                 AppState.doneCells += seg.count
                 AppState.resumeSegment++
                 updateProgress(plan)
@@ -161,7 +155,6 @@ class PixelAccessibilityService : AccessibilityService() {
             }
             nextGroup()
         }
-        return true
     }
 
     private fun nextGroup() {
