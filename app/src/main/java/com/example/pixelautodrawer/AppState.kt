@@ -31,7 +31,8 @@ fun buildSegments(cells: List<Pair<Int, Int>>): List<Segment> {
 }
 
 object AppState {
-    const val MAX_COLORS = 32
+    /** ตัวเลือกจำนวนสีที่ดึงจากรูปต้นแบบ */
+    private val COLOR_STEPS = intArrayOf(3, 5, 8, 16, 32)
     private val MULTIPLIERS = intArrayOf(1, 2, 3, 5)
 
     var sourceBitmap: Bitmap? = null
@@ -39,10 +40,13 @@ object AppState {
     var scaledBitmap: Bitmap? = null
     var plan: DrawPlan? = null
 
+    var colorStepIndex = 1
+    val colorLimit: Int get() = COLOR_STEPS[colorStepIndex]
+
     var topLeft: PointF? = null
     var bottomRight: PointF? = null
 
-    /** มุมถาดสีที่ผู้ใช้กำหนดไว้ สำหรับจับสีอัตโนมัติ */
+    /** ขอบถาดสีที่ผู้ใช้กำหนดไว้ สำหรับจับสีอัตโนมัติ */
     var paletteTL: PointF? = null
     var paletteBR: PointF? = null
 
@@ -68,14 +72,18 @@ object AppState {
         multiplierIndex = (multiplierIndex + 1) % MULTIPLIERS.size
     }
 
+    fun cycleColorLimit() {
+        colorStepIndex = (colorStepIndex + 1) % COLOR_STEPS.size
+    }
+
     fun delayMs(): Long = (speed.delayMs / multiplier).coerceAtLeast(5L)
 
     fun colorDelayMs(): Long = (120L / multiplier).coerceAtLeast(40L)
 
-    /** คำนวณแผนการวาดใหม่เมื่อเปลี่ยนภาพหรือขนาด */
+    /** คำนวณแผนการวาดใหม่เมื่อเปลี่ยนภาพ ขนาด หรือจำนวนสี */
     fun rebuild() {
         val src = sourceBitmap ?: return
-        val result = PixelPlanner.build(src, gridSize, MAX_COLORS)
+        val result = PixelPlanner.build(src, gridSize, colorLimit)
         scaledBitmap = result.scaled
         plan = result.plan
         swatchPoints.clear()
