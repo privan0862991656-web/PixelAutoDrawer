@@ -4,7 +4,7 @@
     android:layout_height="wrap_content"
     android:background="@drawable/bg_panel"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:padding="8dp">
 
     <LinearLayout
         android:id="@+id/dragHandle"
@@ -12,80 +12,111 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingBottom="8dp">
+        android:paddingBottom="6dp">
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="✦ ลากเพื่อย้าย ✦"
+            android:text="✦ ลาก ✦"
             android:textColor="@color/gold"
-            android:textSize="15sp"
+            android:textSize="12sp"
             android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnMin"
+            style="@style/GoldButton"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:text="–"
+            android:textSize="14sp" />
 
         <Button
             android:id="@+id/btnClose"
             style="@style/RedButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginStart="4dp"
             android:minHeight="0dp"
             android:padding="0dp"
             android:text="✕"
-            android:textSize="14sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp"
+        android:layout_marginBottom="4dp"
         android:textColor="@color/light"
-        android:textSize="13sp" />
+        android:textSize="11sp" />
 
     <Button
         android:id="@+id/btnSetTopLeft"
         style="@style/GoldButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="📍 ตั้งมุมซ้ายบน" />
+        android:layout_marginTop="4dp"
+        android:minHeight="0dp"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:text="📍 ตั้งมุมซ้ายบน"
+        android:textSize="12sp" />
 
     <Button
         android:id="@+id/btnSetBottomRight"
         style="@style/GoldButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="📍 ตั้งมุมขวาล่าง" />
+        android:layout_marginTop="4dp"
+        android:minHeight="0dp"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:text="📍 ตั้งมุมขวาล่าง"
+        android:textSize="12sp" />
 
     <Button
         android:id="@+id/btnSetPalette"
         style="@style/GoldButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="🎨 ตั้งตำแหน่งถาดสี" />
+        android:layout_marginTop="4dp"
+        android:minHeight="0dp"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:text="🎨 ตั้งตำแหน่งถาดสี"
+        android:textSize="12sp" />
 
     <Button
         android:id="@+id/btnGhost"
         style="@style/GoldButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="👻 แสดงภาพซ้อนทับ" />
+        android:layout_marginTop="4dp"
+        android:minHeight="0dp"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:text="👻 แสดงภาพซ้อนทับ"
+        android:textSize="12sp" />
 
     <Button
         android:id="@+id/btnSpeed"
         style="@style/GoldButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="⚡ ความเร็ว" />
+        android:layout_marginTop="4dp"
+        android:minHeight="0dp"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:text="⚡ ความเร็ว"
+        android:textSize="12sp" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="8dp"
         android:orientation="horizontal">
 
         <Button
@@ -94,16 +125,24 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="▶ เริ่มวาด" />
+            android:minHeight="0dp"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp"
+            android:text="▶ เริ่มวาด"
+            android:textSize="12sp" />
 
         <Button
             android:id="@+id/btnStop"
             style="@style/RedButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="4dp"
             android:layout_weight="1"
-            android:text="■ หยุด" />
+            android:minHeight="0dp"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp"
+            android:text="■ หยุด"
+            android:textSize="12sp" />
     </LinearLayout>
 
     <ProgressBar
@@ -111,7 +150,7 @@
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="8dp"
         android:max="100"
         android:progress="0"
         android:progressBackgroundTint="#33FFFFFF"
@@ -124,5 +163,6 @@
         android:gravity="center"
         android:text="วาดแล้ว 0%"
         android:textColor="@color/gold"
+        android:textSize="11sp"
         android:textStyle="bold" />
 </LinearLayout>
