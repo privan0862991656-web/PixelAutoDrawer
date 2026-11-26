@@ -180,7 +180,7 @@ class FloatingService : Service() {
         if (uiWasMinimized) showBubble() else showPanel()
     }
 
-    private fun bindPanel(v: View) {
+    private fundPanel bindPanel(v: View) {
         tvStatus = v.findViewById(R.id.tvStatus)
         tvProgress = v.findViewById(R.id.tvProgress)
         progressBar = v.findViewById(R.id.progressBar)
