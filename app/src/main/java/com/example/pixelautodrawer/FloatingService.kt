@@ -13,6 +13,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
@@ -21,16 +22,23 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import kotlinx.coroutines.*
+import kotlin.math.abs
 
 class FloatingService : Service() {
 
     private lateinit var wm: WindowManager
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val handler = Handler(Looper.getMainLooper())
+    private val observers = mutableListOf<Job>()
 
     private var panel: View? = null
+    private var bubble: View? = null
     private var ghost: View? = null
     private var capture: View? = null
+    private var uiWasMinimized = false
+
+    private val panelLp by lazy { newParams(dp(220), WindowManager.LayoutParams.WRAP_CONTENT, 12, 120) }
+    private val bubbleLp by lazy { newParams(dp(52), dp(52), 12, 120) }
 
     private lateinit var tvStatus: TextView
     private lateinit var tvProgress: TextView
@@ -48,16 +56,17 @@ class FloatingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (panel == null) showPanel()
+        if (panel == null && bubble == null) showPanel()
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
+        stopObserving()
         scope.cancel()
         removeGhost()
         removeCapture()
-        panel?.let { runCatching { wm.removeView(it) } }
-        panel = null
+        removePanel()
+        removeBubble()
         super.onDestroy()
     }
 
@@ -68,7 +77,19 @@ class FloatingService : Service() {
         else
             WindowManager.LayoutParams.TYPE_PHONE
 
-    // ---------- แผงควบคุม ----------
+    private fun newParams(w: Int, h: Int, xDp: Int, yDp: Int): WindowManager.LayoutParams =
+        WindowManager.LayoutParams(
+            w, h, overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = dp(xDp)
+            y = dp(yDp)
+        }
+
+    // ---------- แสดง / ซ่อนแผงและวงกลมย่อ ----------
 
     private fun showPanel() {
         if (!Settings.canDrawOverlays(this)) {
@@ -77,26 +98,52 @@ class FloatingService : Service() {
             return
         }
         val v = LayoutInflater.from(this).inflate(R.layout.overlay_panel, null)
-        val lp = WindowManager.LayoutParams(
-            dp(280),
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            overlayType(),
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = dp(12)
-            y = dp(120)
-        }
-        bindPanel(v, lp)
-        wm.addView(v, lp)
+        bindPanel(v)
+        wm.addView(v, panelLp)
         panel = v
         observeState()
         refreshStatus()
     }
 
-    private fun bindPanel(v: View, lp: WindowManager.LayoutParams) {
+    private fun minimizeToBubble() {
+        if (panel == null) return
+        bubbleLp.x = panelLp.x
+        bubbleLp.y = panelLp.y
+        removePanel()
+        showBubble()
+    }
+
+    private fun showBubble() {
+        val b = TextView(this).apply {
+            text = "✦"
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setTextColor(0xFF1A1200.toInt())
+            setBackgroundResource(R.drawable.btn_gold)
+        }
+        attachDrag(b, b, bubbleLp) { expandPanel() }
+        wm.addView(b, bubbleLp)
+        bubble = b
+    }
+
+    private fun expandPanel() {
+        removeBubble()
+        panelLp.x = bubbleLp.x
+        panelLp.y = bubbleLp.y
+        showPanel()
+    }
+
+    private fun hideUi() {
+        if (panel != null || bubble != null) uiWasMinimized = bubble != null
+        removePanel()
+        removeBubble()
+    }
+
+    private fun restoreUi() {
+        if (uiWasMinimized) showBubble() else showPanel()
+    }
+
+    private fun bindPanel(v: View) {
         tvStatus = v.findViewById(R.id.tvStatus)
         tvProgress = v.findViewById(R.id.tvProgress)
         progressBar = v.findViewById(R.id.progressBar)
@@ -105,26 +152,11 @@ class FloatingService : Service() {
         btnStart = v.findViewById(R.id.btnStart)
         btnStop = v.findViewById(R.id.btnStop)
 
-        // ลากย้ายแผงจากแถบหัว
-        var startX = 0
-        var startY = 0
-        var touchX = 0f
-        var touchY = 0f
-        v.findViewById<View>(R.id.dragHandle).setOnTouchListener { _, e ->
-            when (e.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    startX = lp.x
-                    startY = lp.y
-                    touchX = e.rawX
-                    touchY = e.rawY
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    lp.x = startX + (e.rawX - touchX).toInt()
-                    lp.y = startY + (e.rawY - touchY).toInt()
-                    wm.updateViewLayout(v, lp)
-                }
-            }
-            true
+        attachDrag(v.findViewById(R.id.dragHandle), v, panelLp, null)
+
+        v.findViewById<Button>(R.id.btnMin).setOnClickListener {
+            it.pulse()
+            minimizeToBubble()
         }
 
         v.findViewById<Button>(R.id.btnClose).setOnClickListener {
@@ -184,7 +216,11 @@ class FloatingService : Service() {
                 toast("ตั้งถาดสีให้ครบก่อน")
                 return@setOnClickListener
             }
-            if (!svc.startDrawing()) toast("เริ่มวาดไม่ได้")
+            if (!svc.startDrawing()) {
+                toast("เริ่มวาดไม่ได้")
+                return@setOnClickListener
+            }
+            minimizeToBubble()
         }
 
         btnStop.setOnClickListener {
@@ -193,14 +229,79 @@ class FloatingService : Service() {
         }
     }
 
+    // ---------- การลาก + ดีดชิดขอบ ----------
+
+    /**
+     * handle = ส่วนที่ใช้จับลาก, root = วิวที่ถูกเพิ่มเข้า WindowManager
+     * ถ้าขยับไม่เกิน slop ถือว่าเป็นการแตะ และจะเรียก onClick
+     */
+    private fun attachDrag(
+        handle: View,
+        root: View,
+        lp: WindowManager.LayoutParams,
+        onClick: (() -> Unit)?
+    ) {
+        val slop = ViewConfiguration.get(this).scaledTouchSlop
+        var startX = 0
+        var startY = 0
+        var touchX = 0f
+        var touchY = 0f
+        var moved = false
+
+        handle.setOnTouchListener { _, e ->
+            when (e.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    startX = lp.x
+                    startY = lp.y
+                    touchX = e.rawX
+                    touchY = e.rawY
+                    moved = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = e.rawX - touchX
+                    val dy = e.rawY - touchY
+                    if (abs(dx) > slop || abs(dy) > slop) moved = true
+                    if (moved) {
+                        lp.x = startX + dx.toInt()
+                        lp.y = startY + dy.toInt()
+                        runCatching { wm.updateViewLayout(root, lp) }
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (moved) {
+                        snapToEdge(root, lp)
+                        runCatching { wm.updateViewLayout(root, lp) }
+                    } else {
+                        onClick?.invoke()
+                    }
+                }
+            }
+            true
+        }
+    }
+
+    /** ดีดให้ชิดขอบซ้ายหรือขวาที่ใกล้ที่สุด และไม่ให้หลุดจอ */
+    private fun snapToEdge(view: View, lp: WindowManager.LayoutParams) {
+        val dm = resources.displayMetrics
+        val w = if (view.width > 0) view.width else dp(220)
+        val h = if (view.height > 0) view.height else dp(52)
+        val margin = dp(4)
+        lp.x = if (lp.x + w / 2 < dm.widthPixels / 2) margin else dm.widthPixels - w - margin
+        val maxY = maxOf(dp(24), dm.heightPixels - h - dp(24))
+        lp.y = lp.y.coerceIn(dp(24), maxY)
+    }
+
+    // ---------- สถานะ ----------
+
     private fun observeState() {
-        scope.launch {
+        stopObserving()
+        observers += scope.launch {
             AppState.progress.collect { p ->
                 progressBar.progress = p
                 tvProgress.text = "วาดแล้ว $p%"
             }
         }
-        scope.launch {
+        observers += scope.launch {
             AppState.running.collect { running ->
                 btnStart.isEnabled = !running
                 btnStop.isEnabled = running
@@ -210,13 +311,18 @@ class FloatingService : Service() {
         }
     }
 
+    private fun stopObserving() {
+        observers.forEach { it.cancel() }
+        observers.clear()
+    }
+
     private fun refreshStatus() {
         if (!::tvStatus.isInitialized) return
         val tl = if (AppState.topLeft != null) "✓" else "✗"
         val br = if (AppState.bottomRight != null) "✓" else "✗"
         val plan = AppState.plan
         val sw = if (plan == null) "-" else "${AppState.swatchPoints.size}/${plan.groups.size}"
-        tvStatus.text = "มุมซ้ายบน $tl · มุมขวาล่าง $br\nถาดสี $sw · ขนาด ${AppState.gridSize}×${AppState.gridSize}"
+        tvStatus.text = "มุมซ้าย $tl · มุมขวา $br · ถาดสี $sw\nขนาด ${AppState.gridSize}×${AppState.gridSize}"
         btnSpeed.text = "⚡ ความเร็ว: ${AppState.speed.label}"
         btnGhost.text = if (ghost != null) "🙈 ซ่อนภาพซ้อนทับ" else "👻 แสดงภาพซ้อนทับ"
     }
@@ -246,16 +352,17 @@ class FloatingService : Service() {
             return
         }
         val hex = String.format("#%06X", plan.groups[i].rgb and 0xFFFFFF)
-        captureTap("ตั้งถาดสีที่ ${i + 1}/${plan.groups.size}\nแตะสี $hex ในแอปวาดรูป") { x, y ->
+        captureTap("ตั้งถาดสีที่ ${i + 1}/${plan.groups.size}\nแตะสี $hex ในถาดของแอปวาดรูป\n(เลือกสีที่ใกล้ที่สุด)") { x, y ->
             AppState.swatchPoints.add(PointF(x, y))
             calibrateSwatch(i + 1)
         }
     }
 
-    // ---------- การจับจุดแตะ (overlay เต็มจอชั่วคราว) ----------
+    // ---------- จับจุดแตะ (ซ่อนแผงชั่วคราว) ----------
 
     private fun captureTap(prompt: String, onTap: (Float, Float) -> Unit) {
         removeCapture()
+        hideUi()
 
         val root = FrameLayout(this).apply { setBackgroundColor(0x77000000) }
 
@@ -281,7 +388,11 @@ class FloatingService : Service() {
                 val x = e.rawX
                 val y = e.rawY
                 removeCapture()
-                handler.post { onTap(x, y) }
+                handler.post {
+                    onTap(x, y)
+                    // ถ้า onTap ไม่ได้เริ่มการจับจุดรอบใหม่ ให้แสดง UI กลับ
+                    if (capture == null) restoreUi()
+                }
             }
             true
         }
@@ -296,11 +407,6 @@ class FloatingService : Service() {
         )
         wm.addView(root, lp)
         capture = root
-    }
-
-    private fun removeCapture() {
-        capture?.let { runCatching { wm.removeView(it) } }
-        capture = null
     }
 
     // ---------- ภาพซ้อนทับ (ghost) ----------
@@ -343,10 +449,34 @@ class FloatingService : Service() {
         refreshStatus()
     }
 
+    // ---------- ตัวช่วยลบ view ----------
+
+    private fun removeView(v: View?) {
+        if (v != null) runCatching { wm.removeView(v) }
+    }
+
+    private fun removePanel() {
+        stopObserving()
+        removeView(panel)
+        panel = null
+    }
+
+    private fun removeBubble() {
+        removeView(bubble)
+        bubble = null
+    }
+
+    private fun removeCapture() {
+        removeView(capture)
+        capture = null
+    }
+
     private fun removeGhost() {
-        ghost?.let { runCatching { wm.removeView(it) } }
+        removeView(ghost)
         ghost = null
     }
 
-    private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    private fun toast(msg: String) {
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    }
 }
