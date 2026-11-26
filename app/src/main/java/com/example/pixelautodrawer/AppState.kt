@@ -42,6 +42,10 @@ object AppState {
     var topLeft: PointF? = null
     var bottomRight: PointF? = null
 
+    /** มุมถาดสีที่ผู้ใช้กำหนดไว้ สำหรับจับสีอัตโนมัติ */
+    var paletteTL: PointF? = null
+    var paletteBR: PointF? = null
+
     /** ถาดสีของแต่ละกลุ่มสี (index ตรงกับ plan.groups) null = ยังไม่ตั้ง */
     val swatchPoints = mutableListOf<PointF?>()
     /** กลุ่มสีที่ผู้ใช้สั่งข้าม */
