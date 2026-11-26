@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeNone"
-    android:accessibilityFeedbackType="feedbackGeneric"
-    android:canPerformGestures="true"
-    android:canRetrieveWindowContent="false"
-    android:canTakeScreenshot="true"
-    android:description="@string/a11y_desc"
-    android:notificationTimeout="100" />
+<accessibility-service xmlns:android="[http://schemas.android.com/apk/res/android](http://schemas.android.com/apk/res/android)"
+android:accessibilityEventTypes="typeAllMask"
+android:accessibilityFeedbackType="feedbackAllMask"
+android:canRetrieveWindowContent="true"
+android:canPerformGestures="true"
+android:notificationTimeout="100" />
