@@ -1,0 +1,9 @@
+<resources>
+    <color name="gold">#FFD700</color>
+    <color name="gold_dark">#B8860B</color>
+    <color name="ink">#1A1200</color>
+    <color name="light">#F5F0FF</color>
+    <color name="card">#1E1A3A</color>
+    <color name="danger">#FF5E5E</color>
+    <color name="danger_dark">#8B0000</color>
+</resources>
